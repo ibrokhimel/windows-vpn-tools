@@ -97,6 +97,18 @@ Test-Case 'common typed and fallback errors' {
     Assert-Equal 1 $fallback.exitCode 'fallback exit'
 }
 
+Test-Case 'real provider imports preserve common commands' {
+    $commonPath = Join-Path $root 'src\VpnCtl.Common.psm1'
+    foreach ($providerFile in @('ExpressVpnProvider.psm1', 'HotspotShieldProvider.psm1')) {
+        Import-Module $commonPath -Force
+        Import-Module (Join-Path $root "src\$providerFile") -Force
+        Assert-True ($null -ne (Get-Command Get-VpnCtlErrorInfo -ErrorAction SilentlyContinue)) `
+            "$providerFile preserves Get-VpnCtlErrorInfo"
+        Assert-True ($null -ne (Get-Command New-VpnCtlResult -ErrorAction SilentlyContinue)) `
+            "$providerFile preserves New-VpnCtlResult"
+    }
+}
+
 Test-Case 'status normalizes provider and returns JSON' {
     $result = Invoke-Cli @('status', '--provider', 'EXPRESSVPN')
     Assert-Equal 0 $result.ExitCode 'status exit'
@@ -160,7 +172,7 @@ Test-Case 'text renders status fields' {
     Assert-Equal '' $result.Stderr 'text stderr'
 }
 
-Test-Case 'typed provider timeout maps to exit 2' {
+Test-Case 'subprocess provider failure returns one JSON error' {
     $result = Invoke-Cli @('connect', '--provider', 'expressvpn', '--location', '__timeout__')
     Assert-Equal 2 $result.ExitCode 'timeout exit'
     $json = Assert-JsonBoundary $result 'timeout'
