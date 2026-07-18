@@ -161,10 +161,15 @@ function Test-SubscriptionRestrictionText {
     param([string]$Text)
     return $Text -match '(?ix)
         \bupgrade\s+to\s+(?:an?\s+)?(?:premium|paid|higher)\b |
+        \bupgrade\s+(?:your|the)\s+plan\b |
         \b(?:get|go)\s+premium\b |
         \bsubscribe\s+to\s+(?:unlock|access|connect|continue)\b |
+        \bavailable\s+with\s+premium\b |
+        \bpremium\s+location\b |
+        \bunlock\s+with\s+premium\b |
+        \bsubscribers?\s+only\b |
         \b(?:subscription|premium|plan)\b.{0,40}\b(?:required|only|needed)\b |
-        \b(?:requires?|needs?)\b.{0,40}\b(?:subscription|premium|plan|upgrade)\b
+        \b(?:requires?|needs?)\b.{0,40}\b(?:subscription|premium|plan)\b
     '
 }
 
