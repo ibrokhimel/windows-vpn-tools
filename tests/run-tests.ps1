@@ -167,6 +167,15 @@ Test-Case 'typed provider timeout maps to exit 2' {
     Assert-Equal 'timeout' $json.error.code 'timeout code'
 }
 
+Test-Case 'text mode renders typed failures as text' {
+    $result = Invoke-Cli @('connect', '--provider', 'expressvpn', '--location', '__timeout__', '--text')
+    Assert-Equal 2 $result.ExitCode 'text timeout exit'
+    Assert-True ($result.Stdout -match 'timeout') 'text timeout code'
+    Assert-True ($result.Stdout -match 'Fake provider timed out') 'text timeout message'
+    Assert-True (-not ($result.Stdout.TrimStart().StartsWith('{'))) 'text failure must not be JSON'
+    Assert-Equal '' $result.Stderr 'text timeout stderr'
+}
+
 [Console]::Out.WriteLine("$script:Passed passed, $($script:Failures.Count) failed")
 foreach ($failure in $script:Failures) {
     [Console]::Out.WriteLine("  $failure")

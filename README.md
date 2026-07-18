@@ -153,12 +153,12 @@ State identifiers are normalized lowercase values such as `connected`,
 | 1 | Operational error: missing app, unexpected UI, ambiguous location, or no match | `operational_error` |
 | 2 | Timed out waiting for the requested state | `timeout` |
 | 3 | The provider explicitly reported a connection failure | `provider_failure` |
+| 4 | The provider explicitly reported a subscription or plan restriction | `subscription_required` |
 | 64 | Invalid command-line usage | `usage_error` |
 
-Every nonzero exit during normal CLI operation produces an `ok: false` JSON
-result. Text mode changes rendering only; it does not change provider behavior
-or exit-code selection. Errors remain JSON so machine-readable failures are
-preserved.
+Every nonzero exit during normal CLI operation produces an `ok: false` result.
+Text mode renders that same failure as concise text; it does not change provider
+behavior or exit-code selection.
 
 ## Legacy compatibility
 
@@ -189,8 +189,9 @@ human-readable output.
 ```
 
 Both legacy scripts accept `-TimeoutSec`. Their established exit codes remain
-`0` for success, `1` for operational errors, `2` for timeouts, and `3` when
-Hotspot Shield explicitly reports that it cannot connect.
+`0` for success, `1` for operational errors, `2` for timeouts, `3` when
+Hotspot Shield explicitly reports that it cannot connect, and `4` when either
+provider explicitly displays a subscription or plan restriction.
 
 ## Why UI Automation?
 
@@ -203,6 +204,8 @@ over the mouse.
 ## Limitations
 
 - Vendor UI redesigns can require selector updates.
+- Subscription restrictions are categorized only when visible provider UI
+  explicitly identifies a subscription, premium, upgrade, or plan requirement.
 - Location pickers are virtualized. `locations` and `-ListLocations` report
   only entries realized by the current UI; direct connection by name can still
   reach entries omitted from that list.

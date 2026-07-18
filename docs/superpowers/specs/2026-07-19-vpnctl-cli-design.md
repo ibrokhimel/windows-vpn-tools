@@ -123,6 +123,8 @@ It does not alter behavior or exit-code selection.
   location, or no matching location.
 - `2`: timeout waiting for the requested state.
 - `3`: the provider explicitly reported a connection failure.
+- `4`: the provider reported that the requested location requires a
+  subscription or plan upgrade.
 - `64`: invalid command-line usage.
 
 Every nonzero exit in normal CLI operation produces an `ok: false` result.
@@ -134,6 +136,13 @@ Errors are categorized internally and mapped to a stable machine error code,
 message, and process exit code at the CLI boundary. Error messages may improve
 over time; machine callers must branch on the JSON error code or process exit
 code rather than matching message text.
+
+When a connect attempt does not succeed, the provider inspects visible app
+dialogs, banners, and text for an explicit subscription, premium, upgrade, or
+plan restriction before returning a generic provider failure or timeout. A
+clear restriction produces error code `subscription_required` and exit code
+`4`. The CLI does not infer account tier from a location name or guess when the
+provider UI does not expose a recognizable restriction.
 
 ## Compatibility and constraints
 
@@ -158,6 +167,7 @@ injecting or substituting provider operations. Tests cover:
 - success and error JSON envelope stability;
 - each command's data shape;
 - operational, timeout, and provider-failure exit-code mapping;
+- explicit subscription-restriction detection and exit-code mapping;
 - text-mode rendering;
 - compatibility-wrapper argument mapping.
 

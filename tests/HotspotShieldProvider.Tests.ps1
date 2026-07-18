@@ -44,6 +44,16 @@ function global:New-VpnCtlException {
 }
 
 $module = Import-Module $modulePath -Force -PassThru
+$realWaitConnectResult = & $module { ${function:Wait-ConnectResult} }
+foreach ($prompt in 'Upgrade to Premium', 'Subscribe to unlock this location') {
+    $isRestriction = & $module { param($Text) Test-SubscriptionRestrictionText $Text } $prompt
+    if (-not $isRestriction) {
+        throw "Explicit subscription prompt was not recognized: $prompt"
+    }
+}
+if (& $module { Test-SubscriptionRestrictionText 'Explore our Premium locations' }) {
+    throw 'Generic Premium marketing text must not be treated as a restriction.'
+}
 $expectedCommands = @('Get-VpnStatus', 'Connect-Vpn', 'Disconnect-Vpn', 'Get-VpnLocations')
 foreach ($command in $expectedCommands) {
     if ($module.ExportedCommands.Keys -notcontains $command) {
@@ -83,6 +93,26 @@ Assert-Equal $switched.changed $true 'A different requested location must trigge
 $selectedLocationQuery = & $module { $script:selectedLocationQuery }
 Assert-Equal $selectedLocationQuery 'France' 'Connect must select the requested location.'
 
+& $module { param($Implementation) Set-Item Function:\Wait-ConnectResult $Implementation } $realWaitConnectResult
+& $module {
+    $script:locationReads = 0
+    function script:Test-VpnConnected { return $true }
+    function script:Get-SelectedLocation {
+        param($Win)
+        $script:locationReads++
+        if ($script:locationReads -lt 3) { return 'Germany' }
+        return 'France'
+    }
+    function script:Select-HssLocation { param($Win, $Query) return 'FRPAR : France' }
+    function script:Test-TextVisible { param($Win, $Pattern) return $false }
+    function script:Test-SubscriptionRestriction { param($Win) return $false }
+    function script:Start-Sleep { param($Milliseconds) }
+}
+$switched = Connect-Vpn -Location 'FRPAR' -TimeoutSec 1
+Assert-Equal $switched.location 'France' 'Switch must wait for the requested display name or code.'
+$locationReads = & $module { $script:locationReads }
+if ($locationReads -lt 3) { throw 'Switch returned while the old connected tunnel was still selected.' }
+
 & $module {
     function script:Test-VpnConnected { return $false }
     function script:Find-ById { param($Root, $Id) return [pscustomobject]@{} }
@@ -95,6 +125,19 @@ try {
 } catch {
     Assert-Equal $_.Exception.Data['VpnCtlCode'] 'provider_failure' 'Connect failure must be categorized.'
     Assert-Equal $_.Exception.Data['VpnCtlExitCode'] 3 'Provider failure must use exit code 3.'
+}
+
+& $module { param($Implementation) Set-Item Function:\Wait-ConnectResult $Implementation } $realWaitConnectResult
+& $module {
+    function script:Test-VpnConnected { return $false }
+    function script:Test-SubscriptionRestriction { param($Win) return $true }
+}
+try {
+    Connect-Vpn -TimeoutSec 1
+    throw 'Expected subscription restriction.'
+} catch {
+    Assert-Equal $_.Exception.Data['VpnCtlCode'] 'subscription_required' 'Subscription restriction must be categorized.'
+    Assert-Equal $_.Exception.Data['VpnCtlExitCode'] 4 'Subscription restriction must use exit code 4.'
 }
 
 & $module {

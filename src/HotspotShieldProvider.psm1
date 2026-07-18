@@ -157,21 +157,70 @@ function Test-TextVisible {
     return $false
 }
 
+function Test-SubscriptionRestrictionText {
+    param([string]$Text)
+    return $Text -match '(?ix)
+        \bupgrade\s+to\s+(?:an?\s+)?(?:premium|paid|higher)\b |
+        \b(?:get|go)\s+premium\b |
+        \bsubscribe\s+to\s+(?:unlock|access|connect|continue)\b |
+        \b(?:subscription|premium|plan)\b.{0,40}\b(?:required|only|needed)\b |
+        \b(?:requires?|needs?)\b.{0,40}\b(?:subscription|premium|plan|upgrade)\b
+    '
+}
+
+function Test-SubscriptionRestriction {
+    param($Window)
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+        $script:AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
+    foreach ($text in $Window.FindAll($script:TS::Descendants, $condition)) {
+        if (-not $text.Current.IsOffscreen -and
+            (Test-SubscriptionRestrictionText $text.Current.Name)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Wait-ConnectResult {
-    param($Window, [int]$Seconds)
+    param($Window, [int]$Seconds, [string]$RequestedLocation)
     $deadline = (Get-Date).AddSeconds($Seconds)
     while ((Get-Date) -lt $deadline) {
-        if (Test-VpnConnected) { return 'connected' }
+        if (Test-VpnConnected) {
+            $selected = Get-SelectedLocation $Window
+            if ([string]::IsNullOrWhiteSpace($RequestedLocation) -or
+                (Test-HssLocationMatch $selected $RequestedLocation)) {
+                return 'connected'
+            }
+        }
+        if (Test-SubscriptionRestriction $Window) {
+            return 'subscription-required'
+        }
         if (Test-TextVisible $Window "Can't connect") { return 'cant-connect' }
         Start-Sleep -Milliseconds 800
     }
     return 'timeout'
 }
 
+function Test-HssLocationMatch {
+    param([string]$Selected, [string]$Requested)
+    if ($Selected -ieq $Requested) { return $true }
+    $selectedLocation = ConvertTo-HssLocation $Selected
+    $requestedLocation = ConvertTo-HssLocation $Requested
+    return ($selectedLocation.name -ieq $requestedLocation.name) -or
+        ($selectedLocation.PSObject.Properties['code'] -and
+            $selectedLocation.code -ieq $Requested) -or
+        ($requestedLocation.PSObject.Properties['code'] -and
+            $requestedLocation.code -ieq $Selected)
+}
+
 function Assert-ConnectResult {
     param([string]$Result, [int]$TimeoutSec)
     switch ($Result) {
         'connected' { return }
+        'subscription-required' {
+            throw (New-HssError -Code 'subscription_required' `
+                -Message 'Hotspot Shield reported that this connection requires a subscription or plan upgrade.' -ExitCode 4)
+        }
         'cant-connect' {
             throw (New-HssError -Code 'provider_failure' `
                 -Message "Hotspot Shield reported that it can't connect." -ExitCode 3)
@@ -273,6 +322,7 @@ function Select-HssLocation {
             -Message "The Connect button for '$($target.Current.Name)' is unavailable.")
     }
     Invoke-El $connectButton
+    return $target.Current.Name
 }
 
 function Get-VpnStatus {
@@ -309,10 +359,13 @@ function Connect-Vpn {
         }
         Invoke-El $button
     } else {
-        Select-HssLocation $window $Location
+        $selectedTarget = Select-HssLocation $window $Location
+        if (-not [string]::IsNullOrWhiteSpace($selectedTarget)) {
+            $Location = $selectedTarget
+        }
     }
 
-    Assert-ConnectResult (Wait-ConnectResult $window $TimeoutSec) $TimeoutSec
+    Assert-ConnectResult (Wait-ConnectResult $window $TimeoutSec $Location) $TimeoutSec
     return [pscustomobject][ordered]@{
         state = 'connected'
         location = Get-SelectedLocation $window

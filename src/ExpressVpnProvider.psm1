@@ -166,6 +166,43 @@ function Wait-ForState {
     return $false
 }
 
+function Test-SubscriptionRestrictionText {
+    param([string]$Text)
+    return $Text -match '(?ix)
+        \bupgrade\s+to\s+(?:an?\s+)?(?:premium|paid|higher)\b |
+        \b(?:get|go)\s+premium\b |
+        \bsubscribe\s+to\s+(?:unlock|access|connect|continue)\b |
+        \b(?:subscription|premium|plan)\b.{0,40}\b(?:required|only|needed)\b |
+        \b(?:requires?|needs?)\b.{0,40}\b(?:subscription|premium|plan|upgrade)\b
+    '
+}
+
+function Test-SubscriptionRestriction {
+    param($Window)
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+        $script:AE::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::Text
+    )
+    foreach ($text in $Window.FindAll($script:TS::Descendants, $condition)) {
+        if (-not $text.Current.IsOffscreen -and
+            (Test-SubscriptionRestrictionText $text.Current.Name)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function New-SubscriptionError {
+    $message = 'ExpressVPN reported that this connection requires a subscription or plan upgrade.'
+    if (Get-Command New-VpnCtlException -ErrorAction SilentlyContinue) {
+        return New-VpnCtlException -Code 'subscription_required' -Message $message -ExitCode 4
+    }
+    $exception = New-Object -TypeName System.Exception -ArgumentList $message
+    $exception.Data['VpnCtlCode'] = 'subscription_required'
+    $exception.Data['VpnCtlExitCode'] = 4
+    return $exception
+}
+
 function Close-Picker {
     param([System.Windows.Automation.AutomationElement]$Window)
 
@@ -291,6 +328,9 @@ function Connect-Vpn {
         }
         Invoke-Element $button
         if (-not (Wait-ForState $window '^Connected' $TimeoutSec)) {
+            if (Test-SubscriptionRestriction $window) {
+                throw (New-SubscriptionError)
+            }
             $message = "ExpressVPN did not reach the connected state within $TimeoutSec seconds."
             throw (New-TimeoutError $message)
         }
@@ -369,6 +409,9 @@ function Connect-Vpn {
             Start-Sleep -Milliseconds 800
         } while ((Get-Date) -lt $deadline)
 
+        if (Test-SubscriptionRestriction $window) {
+            throw (New-SubscriptionError)
+        }
         $message = "ExpressVPN did not reach the connected state within $TimeoutSec seconds."
         throw (New-TimeoutError $message)
     } finally {

@@ -475,7 +475,7 @@ if (-not $result.ok) { throw $result.error.message }
 ```
 
 Document the stable JSON envelope, command-specific `data`, exit codes
-0/1/2/3/64, exact provider identifiers, one-document stdout guarantee, and
+0/1/2/3/4/64, exact provider identifiers, one-document stdout guarantee, and
 interactive-desktop limitation. Retain a compatibility section for both
 `Switch-*.ps1` scripts.
 

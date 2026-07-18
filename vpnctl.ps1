@@ -44,6 +44,10 @@ function Format-VpnCtlText {
             }
         }
     }
+    if ($null -ne $Result.error) {
+        $lines += "Error: $($Result.error.code)"
+        $lines += "Message: $($Result.error.message)"
+    }
     return ($lines -join [Environment]::NewLine)
 }
 
@@ -152,7 +156,11 @@ try {
     $info = Get-VpnCtlErrorInfo -Exception $_.Exception
     $result = New-VpnCtlResult -Ok $false -Provider $provider -Command $command `
         -ErrorCode $info.code -Message $info.message
-    Write-VpnCtlJson $result
+    if ($text) {
+        [Console]::Out.WriteLine((Format-VpnCtlText $result))
+    } else {
+        Write-VpnCtlJson $result
+    }
     $exitCode = $info.exitCode
 }
 
