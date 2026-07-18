@@ -1,5 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
+$commonModule = Join-Path $PSScriptRoot 'VpnCtl.Common.psm1'
+if (-not (Get-Command New-VpnCtlException -ErrorAction SilentlyContinue) -and
+    (Test-Path -LiteralPath $commonModule)) {
+    Import-Module $commonModule
+}
+
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
 $script:AE = [System.Windows.Automation.AutomationElement]
