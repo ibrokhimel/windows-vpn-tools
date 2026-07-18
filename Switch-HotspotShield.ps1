@@ -12,6 +12,10 @@
     behind other windows; it does not need keyboard/mouse focus, except that
     the app window must exist (it is summoned from the tray automatically).
 
+    Exit codes: 0 success, 1 operational error, 2 timeout, 3 explicit
+    connection failure, and 4 when the provider explicitly displays a
+    subscription or plan restriction.
+
 .EXAMPLE
     .\Switch-Vpn.ps1 -Status
 .EXAMPLE

@@ -158,20 +158,45 @@ function Test-TextVisible {
 }
 
 function Wait-ConnectResult {
-    param($Window, [int]$Seconds)
+    param($Window, [int]$Seconds, [string]$RequestedLocation)
     $deadline = (Get-Date).AddSeconds($Seconds)
     while ((Get-Date) -lt $deadline) {
-        if (Test-VpnConnected) { return 'connected' }
+        if (Test-VpnConnected) {
+            $selected = Get-SelectedLocation $Window
+            if ([string]::IsNullOrWhiteSpace($RequestedLocation) -or
+                (Test-HssLocationMatch $selected $RequestedLocation)) {
+                return 'connected'
+            }
+        }
+        if (Test-TextVisible $Window '(?i)(subscription|premium|upgrade|plan).*(required|only|needed|upgrade)|(?i)(requires|need).*(subscription|premium|upgrade|plan)') {
+            return 'subscription-required'
+        }
         if (Test-TextVisible $Window "Can't connect") { return 'cant-connect' }
         Start-Sleep -Milliseconds 800
     }
     return 'timeout'
 }
 
+function Test-HssLocationMatch {
+    param([string]$Selected, [string]$Requested)
+    if ($Selected -ieq $Requested) { return $true }
+    $selectedLocation = ConvertTo-HssLocation $Selected
+    $requestedLocation = ConvertTo-HssLocation $Requested
+    return ($selectedLocation.name -ieq $requestedLocation.name) -or
+        ($selectedLocation.PSObject.Properties['code'] -and
+            $selectedLocation.code -ieq $Requested) -or
+        ($requestedLocation.PSObject.Properties['code'] -and
+            $requestedLocation.code -ieq $Selected)
+}
+
 function Assert-ConnectResult {
     param([string]$Result, [int]$TimeoutSec)
     switch ($Result) {
         'connected' { return }
+        'subscription-required' {
+            throw (New-HssError -Code 'subscription_required' `
+                -Message 'Hotspot Shield reported that this connection requires a subscription or plan upgrade.' -ExitCode 4)
+        }
         'cant-connect' {
             throw (New-HssError -Code 'provider_failure' `
                 -Message "Hotspot Shield reported that it can't connect." -ExitCode 3)
@@ -273,6 +298,7 @@ function Select-HssLocation {
             -Message "The Connect button for '$($target.Current.Name)' is unavailable.")
     }
     Invoke-El $connectButton
+    return $target.Current.Name
 }
 
 function Get-VpnStatus {
@@ -309,10 +335,13 @@ function Connect-Vpn {
         }
         Invoke-El $button
     } else {
-        Select-HssLocation $window $Location
+        $selectedTarget = Select-HssLocation $window $Location
+        if (-not [string]::IsNullOrWhiteSpace($selectedTarget)) {
+            $Location = $selectedTarget
+        }
     }
 
-    Assert-ConnectResult (Wait-ConnectResult $window $TimeoutSec) $TimeoutSec
+    Assert-ConnectResult (Wait-ConnectResult $window $TimeoutSec $Location) $TimeoutSec
     return [pscustomobject][ordered]@{
         state = 'connected'
         location = Get-SelectedLocation $window

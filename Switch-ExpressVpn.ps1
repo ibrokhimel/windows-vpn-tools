@@ -12,6 +12,9 @@
     Requires an interactive desktop session (will not work on a locked screen).
     Does not need the window to be focused or visible on top.
 
+    Exit codes: 0 success, 1 operational error, 2 timeout, and 4 when the
+    provider explicitly displays a subscription or plan restriction.
+
 .EXAMPLE
     .\Switch-ExpressVpn.ps1 -Status
 .EXAMPLE
