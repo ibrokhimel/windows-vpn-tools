@@ -166,6 +166,17 @@ function Wait-ForState {
     return $false
 }
 
+function Test-SubscriptionRestrictionText {
+    param([string]$Text)
+    return $Text -match '(?ix)
+        \bupgrade\s+to\s+(?:an?\s+)?(?:premium|paid|higher)\b |
+        \b(?:get|go)\s+premium\b |
+        \bsubscribe\s+to\s+(?:unlock|access|connect|continue)\b |
+        \b(?:subscription|premium|plan)\b.{0,40}\b(?:required|only|needed)\b |
+        \b(?:requires?|needs?)\b.{0,40}\b(?:subscription|premium|plan|upgrade)\b
+    '
+}
+
 function Test-SubscriptionRestriction {
     param($Window)
     $condition = New-Object System.Windows.Automation.PropertyCondition(
@@ -174,7 +185,7 @@ function Test-SubscriptionRestriction {
     )
     foreach ($text in $Window.FindAll($script:TS::Descendants, $condition)) {
         if (-not $text.Current.IsOffscreen -and
-            $text.Current.Name -match '(?i)(subscription|premium|upgrade|plan).*(required|only|needed|upgrade)|(?i)(requires|need).*(subscription|premium|upgrade|plan)') {
+            (Test-SubscriptionRestrictionText $text.Current.Name)) {
             return $true
         }
     }

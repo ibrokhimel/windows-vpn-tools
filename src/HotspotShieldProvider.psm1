@@ -157,6 +157,30 @@ function Test-TextVisible {
     return $false
 }
 
+function Test-SubscriptionRestrictionText {
+    param([string]$Text)
+    return $Text -match '(?ix)
+        \bupgrade\s+to\s+(?:an?\s+)?(?:premium|paid|higher)\b |
+        \b(?:get|go)\s+premium\b |
+        \bsubscribe\s+to\s+(?:unlock|access|connect|continue)\b |
+        \b(?:subscription|premium|plan)\b.{0,40}\b(?:required|only|needed)\b |
+        \b(?:requires?|needs?)\b.{0,40}\b(?:subscription|premium|plan|upgrade)\b
+    '
+}
+
+function Test-SubscriptionRestriction {
+    param($Window)
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+        $script:AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
+    foreach ($text in $Window.FindAll($script:TS::Descendants, $condition)) {
+        if (-not $text.Current.IsOffscreen -and
+            (Test-SubscriptionRestrictionText $text.Current.Name)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Wait-ConnectResult {
     param($Window, [int]$Seconds, [string]$RequestedLocation)
     $deadline = (Get-Date).AddSeconds($Seconds)
@@ -168,7 +192,7 @@ function Wait-ConnectResult {
                 return 'connected'
             }
         }
-        if (Test-TextVisible $Window '(?i)(subscription|premium|upgrade|plan).*(required|only|needed|upgrade)|(?i)(requires|need).*(subscription|premium|upgrade|plan)') {
+        if (Test-SubscriptionRestriction $Window) {
             return 'subscription-required'
         }
         if (Test-TextVisible $Window "Can't connect") { return 'cant-connect' }

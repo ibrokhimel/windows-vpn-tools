@@ -51,6 +51,16 @@ foreach ($commandAst in $commands) {
     }
 }
 
+foreach ($prompt in 'Upgrade to Premium', 'Subscribe to unlock this location') {
+    $isRestriction = & $module { param($Text) Test-SubscriptionRestrictionText $Text } $prompt
+    if (-not $isRestriction) {
+        throw "Explicit subscription prompt was not recognized: $prompt"
+    }
+}
+if (& $module { Test-SubscriptionRestrictionText 'Explore our Premium locations' }) {
+    throw 'Generic Premium marketing text must not be treated as a restriction.'
+}
+
 function global:New-VpnCtlException {
     param([string]$Code, [string]$Message, [int]$ExitCode)
     $exception = New-Object System.Exception($Message)
