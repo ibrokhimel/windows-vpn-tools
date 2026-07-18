@@ -69,6 +69,21 @@ Assert-Equal $connected.changed $false 'Already-connected connect must be a no-o
 Assert-Equal $connected.state 'connected' 'Connect must return final state.'
 
 & $module {
+    $script:selectedLocationQuery = $null
+    function script:Test-VpnConnected { return $true }
+    function script:Get-SelectedLocation { param($Win) return 'Germany' }
+    function script:Select-HssLocation {
+        param($Win, $Query)
+        $script:selectedLocationQuery = $Query
+    }
+    function script:Wait-ConnectResult { param($Win, $Seconds) return 'connected' }
+}
+$switched = Connect-Vpn -Location 'France' -TimeoutSec 1
+Assert-Equal $switched.changed $true 'A different requested location must trigger a switch.'
+$selectedLocationQuery = & $module { $script:selectedLocationQuery }
+Assert-Equal $selectedLocationQuery 'France' 'Connect must select the requested location.'
+
+& $module {
     function script:Test-VpnConnected { return $false }
     function script:Find-ById { param($Root, $Id) return [pscustomobject]@{} }
     function script:Invoke-El { param($El) }

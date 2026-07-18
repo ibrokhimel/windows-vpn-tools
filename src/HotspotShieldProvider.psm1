@@ -290,10 +290,13 @@ function Connect-Vpn {
 
     $window = Get-HssWindow
     Enter-Dashboard $window
-    if (Test-VpnConnected) {
+    $isConnected = Test-VpnConnected
+    $selectedLocation = Get-SelectedLocation $window
+    if ($isConnected -and
+        ([string]::IsNullOrWhiteSpace($Location) -or $selectedLocation -ieq $Location)) {
         return [pscustomobject][ordered]@{
             state = 'connected'
-            location = Get-SelectedLocation $window
+            location = $selectedLocation
             changed = $false
         }
     }
