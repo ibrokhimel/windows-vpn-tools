@@ -97,7 +97,12 @@ try {
         }
         default {
             $result = Get-VpnStatus
-            [Console]::Out.WriteLine(('State    : {0}' -f $result.state))
+            $displayState = switch ($result.state) {
+                'connected' { 'Connected' }
+                'disconnected' { 'Disconnected' }
+                default { $result.state }
+            }
+            [Console]::Out.WriteLine(('State    : {0}' -f $displayState))
             [Console]::Out.WriteLine(('Location : {0}' -f $result.location))
         }
     }

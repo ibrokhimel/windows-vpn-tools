@@ -14,6 +14,13 @@ function Assert-Match {
     }
 }
 
+function Assert-CaseSensitiveMatch {
+    param([string]$Actual, [string]$Pattern, [string]$Message)
+    if ($Actual -cnotmatch $Pattern) {
+        throw "$Message Pattern '$Pattern' was not found in '$Actual'."
+    }
+}
+
 $root = Split-Path $PSScriptRoot -Parent
 $scriptPath = Join-Path $root 'Switch-HotspotShield.ps1'
 $source = Get-Content -Raw $scriptPath
@@ -75,7 +82,8 @@ function Invoke-Wrapper {
 
 $status = Invoke-Wrapper @('-Status')
 Assert-Equal $status.ExitCode 0 'Status exit code.'
-Assert-Match $status.Stdout '(?m)^State\s+: connected\r?$' 'Status must retain State label.'
+Assert-CaseSensitiveMatch $status.Stdout '(?m)^State\s+: Connected\r?$' `
+    'Status must retain title-cased legacy state text.'
 Assert-Match $status.Stdout '(?m)^Location\s+: Test Location\r?$' 'Status must retain Location label.'
 
 $location = Invoke-Wrapper @('-Location', 'New York', '-TimeoutSec', '12')
