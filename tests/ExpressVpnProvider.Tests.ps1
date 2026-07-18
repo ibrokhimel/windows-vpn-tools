@@ -51,7 +51,15 @@ foreach ($commandAst in $commands) {
     }
 }
 
-foreach ($prompt in 'Upgrade to Premium', 'Subscribe to unlock this location') {
+foreach ($prompt in @(
+    'Upgrade to Premium'
+    'Subscribe to unlock this location'
+    'Available with Premium'
+    'Premium location'
+    'Unlock with Premium'
+    'Upgrade your plan'
+    'Subscribers only'
+)) {
     $isRestriction = & $module { param($Text) Test-SubscriptionRestrictionText $Text } $prompt
     if (-not $isRestriction) {
         throw "Explicit subscription prompt was not recognized: $prompt"
@@ -59,6 +67,11 @@ foreach ($prompt in 'Upgrade to Premium', 'Subscribe to unlock this location') {
 }
 if (& $module { Test-SubscriptionRestrictionText 'Explore our Premium locations' }) {
     throw 'Generic Premium marketing text must not be treated as a restriction.'
+}
+foreach ($prompt in 'ExpressVPN requires a software upgrade', 'This app needs an upgrade') {
+    if (& $module { param($Text) Test-SubscriptionRestrictionText $Text } $prompt) {
+        throw "Software upgrade text must not be treated as a subscription restriction: $prompt"
+    }
 }
 
 function global:New-VpnCtlException {
