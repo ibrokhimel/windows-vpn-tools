@@ -9,7 +9,7 @@ function Assert-True {
 
 function Assert-Contains {
     param([string]$Actual, [string]$Expected, [string]$Message)
-    if ($Actual -notlike "*$Expected*") {
+    if (-not $Actual.Contains($Expected)) {
         throw "$Message Expected '$Expected' in '$Actual'."
     }
 }
@@ -74,7 +74,9 @@ function Add-TestCall([string]$Value) {
 }
 function Get-VpnStatus {
     Add-TestCall 'status'
-    [pscustomobject]@{ state = 'connected'; location = 'Germany'; tunnel = 'up' }
+    $state = $env:VPNCTL_TEST_STATUS_STATE
+    if (-not $state) { $state = 'connected' }
+    [pscustomobject]@{ state = $state; location = 'Germany'; tunnel = 'up' }
 }
 function Connect-Vpn {
     param([AllowEmptyString()][string]$Location = '', [int]$TimeoutSec = 60)
@@ -108,16 +110,31 @@ Export-ModuleMember -Function Get-VpnStatus, Connect-Vpn, Disconnect-Vpn, Get-Vp
 $oldProvider = $env:VPNCTL_EXPRESSVPN_PROVIDER_MODULE
 $oldLog = $env:VPNCTL_TEST_CALL_LOG
 $oldError = $env:VPNCTL_TEST_ERROR
+$oldStatusState = $env:VPNCTL_TEST_STATUS_STATE
 try {
     $env:VPNCTL_EXPRESSVPN_PROVIDER_MODULE = $fakeProvider
     $env:VPNCTL_TEST_CALL_LOG = $callLog
     $env:VPNCTL_TEST_ERROR = ''
+    $env:VPNCTL_TEST_STATUS_STATE = 'connected'
 
     $output = (& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Status 2>&1) -join "`n"
     Assert-True ($LASTEXITCODE -eq 0) 'Status parameter set must succeed.'
-    Assert-Contains $output 'State    : connected' 'Status output lost the state label.'
+    Assert-Contains $output 'State    : Connected' 'Connected must retain its legacy display text.'
     Assert-Contains $output 'Location : Germany' 'Status output lost the location label.'
     Assert-Contains $output 'Tunnel   : up' 'Status output lost the tunnel label.'
+
+    foreach ($mapping in @(
+        @{ normalized = 'disconnected'; display = 'Not Connected' }
+        @{ normalized = 'connecting'; display = 'Connecting' }
+        @{ normalized = 'unknown'; display = 'Unknown' }
+    )) {
+        $env:VPNCTL_TEST_STATUS_STATE = $mapping.normalized
+        $output = (& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Status 2>&1) -join "`n"
+        Assert-True ($LASTEXITCODE -eq 0) "Status mapping for '$($mapping.normalized)' must succeed."
+        Assert-Contains $output ("State    : {0}" -f $mapping.display) (
+            "Normalized state '$($mapping.normalized)' lost its legacy display text."
+        )
+    }
 
     $output = (& powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Location 'USA - Miami' -TimeoutSec 17 2>&1) -join "`n"
     Assert-True ($LASTEXITCODE -eq 0) 'Location parameter set must succeed.'
@@ -139,6 +156,9 @@ try {
     $calls = @(Get-Content -LiteralPath $callLog)
     $expectedCalls = @(
         'status'
+        'status'
+        'status'
+        'status'
         'connect|USA - Miami|17'
         'connect||19'
         'disconnect|23'
@@ -158,6 +178,7 @@ try {
     $env:VPNCTL_EXPRESSVPN_PROVIDER_MODULE = $oldProvider
     $env:VPNCTL_TEST_CALL_LOG = $oldLog
     $env:VPNCTL_TEST_ERROR = $oldError
+    $env:VPNCTL_TEST_STATUS_STATE = $oldStatusState
     Remove-Item -LiteralPath $tempRoot -Recurse -Force
 }
 

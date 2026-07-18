@@ -96,7 +96,13 @@ try {
         }
         default {
             $result = Get-VpnStatus
-            Write-Output ("State    : {0}" -f $result.state)
+            $displayState = switch ($result.state) {
+                'connected' { 'Connected' }
+                'disconnected' { 'Not Connected' }
+                'connecting' { 'Connecting' }
+                default { 'Unknown' }
+            }
+            Write-Output ("State    : {0}" -f $displayState)
             if ($result.location) {
                 Write-Output ("Location : {0}" -f $result.location)
             }
